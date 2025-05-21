@@ -1,17 +1,38 @@
-<!-- reader.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Reader — Classy Femininity</title>
   <style>
-    html, body { height:100%; margin:0; }
-    #canvas { width:100%; display:block; }
-    .nav { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); }
-    .nav button { margin:0 5px; padding:8px 12px; }
+    html, body { height: 100%; margin: 0; }
+    #canvas { width: 100%; display: block; }
+    .nav {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
+      border-radius: 4px;
+    }
+    .nav button {
+      margin: 0 5px;
+      padding: 8px 12px;
+      background: #b20235;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .nav span {
+      font-family: sans-serif;
+      margin: 0 5px;
+    }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.139/pdf.min.js"></script>
+
+  <!-- PDF.js core library from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfjs-dist/3.10.139/pdf.min.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -22,53 +43,33 @@
   </div>
 
   <script>
-    // Configure PDF.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.139/pdf.worker.min.js';
+    // Point to the matching worker file
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdfjs-dist/3.10.139/pdf.worker.min.js';
 
-    // Get book ID
+    // Grab the book ID from URL (reader.html?book=3)
     const params = new URLSearchParams(window.location.search);
-    let bookId = params.get('book') || '1';
+    const bookId = params.get('book') || '1';
 
-    // Map IDs to your PDF files
-    const urlMap = {
-      '1': 'ebooks/book-1.pdf',
-      '2': 'ebooks/book-2.pdf',
-      '3': 'ebooks/book-3.pdf',
-      '4': 'ebooks/book-4.pdf',
-      '5': 'ebooks/book-5.pdf',
-      '6': 'ebooks/book-6.pdf',
-      '7': 'ebooks/book-7.pdf',
-      '8': 'ebooks/book-8.pdf',
-      '9': 'ebooks/book-9.pdf',
-      '10':'ebooks/book-10.pdf',
-      '11':'ebooks/book-11.pdf',
-      '12':'ebooks/book-12.pdf',
-      '13':'ebooks/book-13.pdf',
-      '14':'ebooks/book-14.pdf',
-      '15':'ebooks/book-15.pdf',
-      '16':'ebooks/book-16.pdf',
-      '17':'ebooks/book-17.pdf',
-      '18':'ebooks/book-18.pdf',
-      '19':'ebooks/book-19.pdf',
-      '20':'ebooks/book-20.pdf'
-    };
-    const url = urlMap[bookId];
-    if (!url) {
-      document.body.innerHTML = '<p style="padding:20px; text-align:center;">🚫 Book not found.</p>';
-      throw new Error('Book not found');
-    }
+    // Dynamically construct the PDF path
+    const url = `ebooks/book-${bookId}.pdf`;
 
-    // PDF.js rendering
-    let pdfDoc = null, pageNum = 1, pageIsRendering = false, pageNumPending = null;
-    const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+    // PDF.js rendering state
+    let pdfDoc = null,
+        pageNum = 1,
+        pageIsRendering = false,
+        pageNumPending = null;
 
+    const canvas = document.getElementById('canvas'),
+          ctx    = canvas.getContext('2d');
+
+    // Render a page
     function renderPage(num) {
       pageIsRendering = true;
       pdfDoc.getPage(num).then(page => {
         const viewport = page.getViewport({ scale: 1.5 });
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+        canvas.height  = viewport.height;
+        canvas.width   = viewport.width;
         page.render({ canvasContext: ctx, viewport }).promise.then(() => {
           pageIsRendering = false;
           if (pageNumPending !== null) {
@@ -79,11 +80,17 @@
         document.getElementById('page-num').textContent = num;
       });
     }
+
+    // Queue page rendering if another page is in progress
     function queueRenderPage(num) {
-      if (pageIsRendering) pageNumPending = num;
-      else renderPage(num);
+      if (pageIsRendering) {
+        pageNumPending = num;
+      } else {
+        renderPage(num);
+      }
     }
 
+    // Prev/Next button handlers
     document.getElementById('prev').addEventListener('click', () => {
       if (pageNum <= 1) return;
       pageNum--;
@@ -95,11 +102,20 @@
       queueRenderPage(pageNum);
     });
 
-    pdfjsLib.getDocument(url).promise.then(pdf => {
-      pdfDoc = pdf;
-      document.getElementById('page-count').textContent = pdf.numPages;
-      renderPage(pageNum);
-    });
+    // Load the PDF
+    pdfjsLib.getDocument(url).promise
+      .then(pdf => {
+        pdfDoc = pdf;
+        document.getElementById('page-count').textContent = pdf.numPages;
+        renderPage(pageNum);
+      })
+      .catch(err => {
+        console.error('PDF load error:', err);
+        document.body.innerHTML = `
+          <p style="padding:20px; text-align:center; color:red;">
+            Could not load PDF (book ${bookId}): ${err.message}
+          </p>`;
+      });
   </script>
 </body>
 </html>
