@@ -8,6 +8,7 @@
     html, body { height:100%; margin:0; }
     body { position:relative; }
     #canvas { width:100%; display:block; }
+
     /* Loader overlay */
     #loader {
       position:fixed; top:0; left:0; right:0; bottom:0;
@@ -23,6 +24,7 @@
       animation:spin 1s linear infinite;
     }
     @keyframes spin { to { transform:rotate(360deg); } }
+
     /* Paywall overlay */
     #paywall {
       position:fixed; top:0; left:0; right:0; bottom:0;
@@ -46,6 +48,7 @@
       cursor:pointer;
       font-size:1rem;
     }
+
     /* Prev/Next controls */
     .nav {
       position:fixed; bottom:10px; left:50%;
@@ -60,6 +63,7 @@
       border:none; border-radius:4px; cursor:pointer;
     }
     .nav span { margin:0 8px; font-family:sans-serif; }
+
     .error {
       padding:20px;
       text-align:center;
@@ -68,9 +72,9 @@
     }
   </style>
 
-  <!-- PDF.js -->
+  <!-- PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <!-- Paddle overlay checkout -->
+  <!-- Paddle v2 overlay checkout -->
   <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 </head>
 <body>
@@ -96,24 +100,26 @@
 
   <script>
     window.addEventListener('load', () => {
-      // ====== YOUR PADDLE CONFIG ======
-      // 1) Vendor ID (number)
-      const PADDLE_VENDOR_ID   = 231536;              // ← replace with your Vendor ID
-      // 2) Monthly subscription Price ID (string)
-      const PADDLE_MONTHLY_ID  = 'pri_01jvt7hbtn145k3jm1em2w8eme';// ← replace with your Monthly Price ID
-      // 3) Yearly subscription Price ID (string)
-      const PADDLE_YEARLY_ID   = 'pri_01jvt7mqrtaxmheszs3afz8ex0'; // ← replace with your Yearly Price ID
-      // ================================
+      // ========= PADDLE CONFIGURATION =========
+      // Replace these placeholders with your real Paddle values:
+      const PADDLE_VENDOR_ID   = 231536;                    // ← your numeric Vendor ID
+      const PADDLE_TOKEN       = 'live_d9709459d165e6395bafefd43a7';  // ← your Client-Side Token (pub_xxx)
+      const PADDLE_MONTHLY_ID  = 'pri_01jvt7hbtn145k3jm1em2w8eme';      // ← your Monthly Price ID (pri_xxx)
+      const PADDLE_YEARLY_ID   = 'pri_01jvt7mqrtaxmheszs3afz8ex0';       // ← your Yearly Price ID (pri_xxx)
+      // ========================================
 
-      // Initialize Paddle
-      Paddle.Setup({ vendor: PADDLE_VENDOR_ID });
+      // Initialize Paddle Overlay Checkout
+      Paddle.Initialize({
+        vendor: PADDLE_VENDOR_ID,
+        token:  PADDLE_TOKEN
+      });
 
-      // Subscription state
+      // Subscription helper
       function isSubscribed() {
         return localStorage.getItem('subscribed') === 'true';
       }
 
-      // Hook subscription buttons
+      // Wire up pay buttons
       document.getElementById('monthly-btn').onclick = () => {
         Paddle.Checkout.open({ product: PADDLE_MONTHLY_ID });
       };
@@ -121,7 +127,7 @@
         Paddle.Checkout.open({ product: PADDLE_YEARLY_ID });
       };
 
-      // On successful checkout
+      // On successful checkout, unlock and resume
       Paddle.Checkout.Register('Checkout.Complete', data => {
         if (data.checkout && data.checkout.completed) {
           localStorage.setItem('subscribed','true');
@@ -140,14 +146,14 @@
 
       console.log('Loading PDF:', pdfUrl);
 
-      const loader = document.getElementById('loader');
+      const loader  = document.getElementById('loader');
       const paywall = document.getElementById('paywall');
 
       function showLoader(on) {
         loader.style.display = on ? 'flex' : 'none';
       }
 
-      // 1) HEAD-check PDF exists
+      // 1) HEAD-check that PDF exists, then load
       fetch(pdfUrl, { method: 'HEAD' })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -163,23 +169,25 @@
           console.error('PDF load error:', err);
           showLoader(false);
           document.body.innerHTML = `<p class="error">
-            Could not load PDF (book ${bookId}): ${err.message}
+            Could not load PDF (Book ${bookId}): ${err.message}
           </p>`;
         });
 
-      // Render logic with paywall
+      // Render logic with paywall gating
       let pageNum = 1, pageIsRendering = false, pageNumPending = null;
+
       function initializeViewer(pdfDoc) {
-        const canvasEl = document.getElementById('canvas');
-        const ctx = canvasEl.getContext('2d');
+        const canvasEl = document.getElementById('canvas'),
+              ctx      = canvasEl.getContext('2d');
 
         function renderPage(num) {
-          // Gate at page 6 for unsubscribed users
+          // Gate after page 5 if not subscribed
           if (num > 5 && !isSubscribed()) {
             paywall.style.display = 'flex';
             return;
           }
           paywall.style.display = 'none';
+
           pageIsRendering = true;
           pdfDoc.getPage(num).then(page => {
             const vp = page.getViewport({ scale: 1.5 });
