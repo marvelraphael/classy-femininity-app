@@ -6,25 +6,84 @@
   <title>Reader — Classy Femininity</title>
   <style>
     html, body { height:100%; margin:0; }
+    body { position:relative; }
     #canvas { width:100%; display:block; }
+    /* Loader overlay */
+    #loader {
+      position:fixed; top:0; left:0; right:0; bottom:0;
+      background:rgba(255,255,255,0.9);
+      display:flex; align-items:center; justify-content:center;
+      z-index:1000;
+    }
+    .spinner {
+      border:6px solid #eee;
+      border-top:6px solid #b20235;
+      border-radius:50%;
+      width:50px; height:50px;
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    /* Paywall overlay */
+    #paywall {
+      position:fixed; top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.8);
+      color:#fff;
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:20px;
+      z-index:1001;
+    }
+    #paywall button {
+      margin:10px;
+      padding:10px 20px;
+      background:#b20235;
+      color:#fff;
+      border:none;
+      border-radius:4px;
+      cursor:pointer;
+      font-size:1rem;
+    }
+    /* Prev/Next controls */
     .nav {
       position:fixed; bottom:10px; left:50%;
-      transform:translateX(-50%); background:rgba(255,255,255,0.8);
-      padding:5px 10px; border-radius:4px;
+      transform:translateX(-50%);
+      background:rgba(255,255,255,0.8);
+      padding:8px 12px;
+      border-radius:4px;
+      z-index:500;
     }
     .nav button {
-      margin:0 5px; padding:8px 12px;
+      margin:0 5px; padding:6px 10px;
       background:#b20235; color:#fff;
-      border:none; border-radius:4px; cursor:pointer;
+      border:none; border-radius:4px;
+      cursor:pointer;
     }
-    .nav span { font-family:sans-serif; margin:0 5px; }
+    .nav span { margin:0 8px; font-family:sans-serif; }
   </style>
 
-  <!-- 1) Load PDF.js (2.16.105) from cdnjs -->
+  <!-- 1) PDF.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <!-- 2) Paddle.js -->
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 </head>
 <body>
+  <!-- Loader -->
+  <div id="loader"><div class="spinner"></div></div>
+
+  <!-- PDF canvas -->
   <canvas id="canvas"></canvas>
+
+  <!-- Paywall -->
+  <div id="paywall">
+    <p>You’ve reached your free preview (5 pages).<br/>Subscribe to continue reading.</p>
+    <button id="monthly-btn">Subscribe Monthly</button>
+    <button id="yearly-btn">Subscribe Yearly</button>
+  </div>
+
+  <!-- Prev/Next -->
   <div class="nav">
     <button id="prev">◀ Prev</button>
     <span id="page-num">1</span> / <span id="page-count">?</span>
@@ -32,30 +91,70 @@
   </div>
 
   <script>
-    // 2) Point to the matching worker
+    // ====== 3) YOUR VARIABLES HERE ======
+    // Replace with your Paddle Vendor ID (from Settings → Account Details)
+    const PADDLE_VENDOR_ID   = 231536;
+    // Copy these from the Paddle UI after creating your subscription prices
+    const PADDLE_MONTHLY_ID  = 'pri_01jvt7hbtn145k3jm1em2w8eme';
+    const PADDLE_YEARLY_ID   = 'pri_01jvt7mqrtaxmheszs3afz8ex0';
+    // ====================================
+
+    // Initialize Paddle
+    Paddle.Setup({ vendor: PADDLE_VENDOR_ID });
+
+    // Check subscription flag
+    function isSubscribed() {
+      return localStorage.getItem('subscribed') === 'true';
+    }
+
+    // Handle subscription buttons
+    document.getElementById('monthly-btn').onclick = () => {
+      Paddle.Checkout.open({ product: PADDLE_MONTHLY_ID });
+    };
+    document.getElementById('yearly-btn').onclick = () => {
+      Paddle.Checkout.open({ product: PADDLE_YEARLY_ID });
+    };
+
+    // On successful checkout
+    Paddle.Checkout.Register('Checkout.Complete', data => {
+      if (data.checkout && data.checkout.completed) {
+        localStorage.setItem('subscribed','true');
+        document.getElementById('paywall').style.display = 'none';
+        queueRenderPage(pageNum);
+      }
+    });
+
+    // ===== PDF.js Setup =====
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-    // 3) Grab the book ID from the URL (?book=1…20)
     const params = new URLSearchParams(window.location.search);
     const bookId = params.get('book') || '1';
+    const pdfUrl = `ebooks/book-${bookId}.pdf`;
 
-    // 4) Build the PDF path dynamically
-    const url = `ebooks/book-${bookId}.pdf`;
+    let pdfDoc = null,
+        pageNum = 1,
+        pageIsRendering = false,
+        pageNumPending = null;
 
-    // 5) PDF.js rendering state
-    let pdfDoc = null, pageNum = 1, pageIsRendering = false, pageNumPending = null;
     const canvas = document.getElementById('canvas'),
           ctx    = canvas.getContext('2d');
 
-    // 6) Render a page
+    // Render a given page
     function renderPage(num) {
+      // Gate after page 5 if not subscribed
+      if (num > 5 && !isSubscribed()) {
+        document.getElementById('paywall').style.display = 'flex';
+        return;
+      }
+      document.getElementById('paywall').style.display = 'none';
+
       pageIsRendering = true;
       pdfDoc.getPage(num).then(page => {
-        const viewport = page.getViewport({ scale: 1.5 });
-        canvas.height  = viewport.height;
-        canvas.width   = viewport.width;
-        page.render({ canvasContext: ctx, viewport }).promise.then(() => {
+        const vp = page.getViewport({ scale: 1.5 });
+        canvas.height = vp.height;
+        canvas.width  = vp.width;
+        page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
           pageIsRendering = false;
           if (pageNumPending !== null) {
             renderPage(pageNumPending);
@@ -66,32 +165,35 @@
       });
     }
 
+    // Queue rendering if one page is already rendering
     function queueRenderPage(num) {
       if (pageIsRendering) pageNumPending = num;
       else renderPage(num);
     }
 
-    // 7) Prev/Next controls
-    document.getElementById('prev').addEventListener('click', () => {
+    // Prev/Next handlers
+    document.getElementById('prev').onclick = () => {
       if (pageNum <= 1) return;
       pageNum--;
       queueRenderPage(pageNum);
-    });
-    document.getElementById('next').addEventListener('click', () => {
+    };
+    document.getElementById('next').onclick = () => {
       if (pageNum >= pdfDoc.numPages) return;
       pageNum++;
       queueRenderPage(pageNum);
-    });
+    };
 
-    // 8) Load the PDF document
-    pdfjsLib.getDocument(url).promise
+    // Load the PDF
+    pdfjsLib.getDocument(pdfUrl).promise
       .then(pdf => {
         pdfDoc = pdf;
         document.getElementById('page-count').textContent = pdf.numPages;
+        document.getElementById('loader').style.display = 'none';
         renderPage(pageNum);
       })
       .catch(err => {
         console.error('PDF load error:', err);
+        document.getElementById('loader').style.display = 'none';
         document.body.innerHTML = `
           <p style="padding:20px; text-align:center; color:red;">
             Could not load PDF (book ${bookId}): ${err.message}
