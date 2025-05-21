@@ -1,0 +1,119 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Classy Femininity</title>
+  <style>
+    body, h1, button { margin:0; font-family: sans-serif; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:10px; }
+    .item { text-align:center; }
+    .item img { width:100%; height:auto; background:#000; }
+    .item button {
+      margin-top:5px;
+      padding:8px 12px;
+      background:#b20235;
+      color:#fff;
+      border:none;
+      border-radius:4px;
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center; padding:16px;">Classy Femininity</h1>
+  <div class="grid">
+    <!-- 20 ebook items -->
+    <div class="item" data-book-id="1">
+      <img src="placeholder-black.png" alt="Cover 1" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="2">
+      <img src="placeholder-black.png" alt="Cover 2" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="3">
+      <img src="placeholder-black.png" alt="Cover 3" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="4">
+      <img src="placeholder-black.png" alt="Cover 4" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="5">
+      <img src="placeholder-black.png" alt="Cover 5" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="6">
+      <img src="placeholder-black.png" alt="Cover 6" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="7">
+      <img src="placeholder-black.png" alt="Cover 7" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="8">
+      <img src="placeholder-black.png" alt="Cover 8" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="9">
+      <img src="placeholder-black.png" alt="Cover 9" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="10">
+      <img src="placeholder-black.png" alt="Cover 10" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="11">
+      <img src="placeholder-black.png" alt="Cover 11" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="12">
+      <img src="placeholder-black.png" alt="Cover 12" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="13">
+      <img src="placeholder-black.png" alt="Cover 13" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="14">
+      <img src="placeholder-black.png" alt="Cover 14" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="15">
+      <img src="placeholder-black.png" alt="Cover 15" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="16">
+      <img src="placeholder-black.png" alt="Cover 16" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="17">
+      <img src="placeholder-black.png" alt="Cover 17" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="18">
+      <img src="placeholder-black.png" alt="Cover 18" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="19">
+      <img src="placeholder-black.png" alt="Cover 19" />
+      <button class="read">Read</button>
+    </div>
+    <div class="item" data-book-id="20">
+      <img src="placeholder-black.png" alt="Cover 20" />
+      <button class="read">Read</button>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.read').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('.item').dataset.bookId;
+        window.location.href = `reader.html?book=${id}`;
+      });
+    });
+  </script>
+</body>
+</html>
