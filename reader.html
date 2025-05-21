@@ -5,34 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Reader — Classy Femininity</title>
   <style>
-    html, body { height: 100%; margin: 0; }
-    #canvas { width: 100%; display: block; }
+    html, body { height:100%; margin:0; }
+    #canvas { width:100%; display:block; }
     .nav {
-      position: fixed;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255,255,255,0.8);
-      padding: 5px 10px;
-      border-radius: 4px;
+      position:fixed; bottom:10px; left:50%;
+      transform:translateX(-50%);
+      background:rgba(255,255,255,0.8); padding:5px 10px;
+      border-radius:4px;
     }
     .nav button {
-      margin: 0 5px;
-      padding: 8px 12px;
-      background: #b20235;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+      margin:0 5px; padding:8px 12px;
+      background:#b20235; color:#fff;
+      border:none; border-radius:4px;
+      cursor:pointer;
     }
-    .nav span {
-      font-family: sans-serif;
-      margin: 0 5px;
-    }
+    .nav span { font-family:sans-serif; margin:0 5px; }
   </style>
 
-  <!-- 1) Load PDF.js from jsDelivr -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.10.139/build/pdf.min.js"></script>
+  <!-- 1) Load the UMD bundle that defines window.pdfjsLib -->
+  <script src="https://unpkg.com/pdfjs-dist@3.10.139/build/pdf.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -43,36 +34,32 @@
   </div>
 
   <script>
-    // 2) Point to the matching worker
+    // 2) Point to the matching worker script
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.10.139/build/pdf.worker.min.js';
+      'https://unpkg.com/pdfjs-dist@3.10.139/build/pdf.worker.js';
 
-    // 3) Read ?book= from URL
-    const params = new URLSearchParams(window.location.search);
+    // 3) Grab the book= parameter
+    const params = new URLSearchParams(location.search);
     const bookId = params.get('book') || '1';
 
-    // 4) Build the path dynamically
+    // 4) Build the PDF URL
     const url = `ebooks/book-${bookId}.pdf`;
 
-    // 5) Prepare rendering state
-    let pdfDoc = null,
-        pageNum = 1,
-        pageIsRendering = false,
-        pageNumPending = null;
-
+    // 5) Prepare PDF.js state
+    let pdfDoc = null, pageNum = 1, pageIsRendering = false, pageNumPending = null;
     const canvas = document.getElementById('canvas'),
           ctx    = canvas.getContext('2d');
 
-    // 6) Render a given page
+    // 6) Render function
     function renderPage(num) {
       pageIsRendering = true;
       pdfDoc.getPage(num).then(page => {
         const viewport = page.getViewport({ scale: 1.5 });
-        canvas.height  = viewport.height;
-        canvas.width   = viewport.width;
+        canvas.height = viewport.height;
+        canvas.width  = viewport.width;
         page.render({ canvasContext: ctx, viewport }).promise.then(() => {
           pageIsRendering = false;
-          if (pageNumPending !== null) {
+          if (pageNumPending) {
             renderPage(pageNumPending);
             pageNumPending = null;
           }
@@ -81,25 +68,24 @@
       });
     }
 
-    // 7) Queue pages if a render is in progress
-    function queueRenderPage(num) {
+    function queueRender(num) {
       if (pageIsRendering) pageNumPending = num;
       else renderPage(num);
     }
 
-    // 8) Wire up Prev/Next buttons
-    document.getElementById('prev').addEventListener('click', () => {
+    // 7) Prev/Next handlers
+    document.getElementById('prev').onclick = () => {
       if (pageNum <= 1) return;
       pageNum--;
-      queueRenderPage(pageNum);
-    });
-    document.getElementById('next').addEventListener('click', () => {
+      queueRender(pageNum);
+    };
+    document.getElementById('next').onclick = () => {
       if (pageNum >= pdfDoc.numPages) return;
       pageNum++;
-      queueRenderPage(pageNum);
-    });
+      queueRender(pageNum);
+    };
 
-    // 9) Load the PDF document
+    // 8) Load the document
     pdfjsLib.getDocument(url).promise
       .then(pdf => {
         pdfDoc = pdf;
