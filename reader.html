@@ -9,21 +9,19 @@
     #canvas { width:100%; display:block; }
     .nav {
       position:fixed; bottom:10px; left:50%;
-      transform:translateX(-50%);
-      background:rgba(255,255,255,0.8); padding:5px 10px;
-      border-radius:4px;
+      transform:translateX(-50%); background:rgba(255,255,255,0.8);
+      padding:5px 10px; border-radius:4px;
     }
     .nav button {
       margin:0 5px; padding:8px 12px;
       background:#b20235; color:#fff;
-      border:none; border-radius:4px;
-      cursor:pointer;
+      border:none; border-radius:4px; cursor:pointer;
     }
     .nav span { font-family:sans-serif; margin:0 5px; }
   </style>
 
-  <!-- 1) Load the UMD bundle that defines window.pdfjsLib -->
-  <script src="https://unpkg.com/pdfjs-dist@3.10.139/build/pdf.js"></script>
+  <!-- 1) Load PDF.js (2.16.105) from cdnjs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -34,32 +32,32 @@
   </div>
 
   <script>
-    // 2) Point to the matching worker script
+    // 2) Point to the matching worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://unpkg.com/pdfjs-dist@3.10.139/build/pdf.worker.js';
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-    // 3) Grab the book= parameter
-    const params = new URLSearchParams(location.search);
+    // 3) Grab the book ID from the URL (?book=1…20)
+    const params = new URLSearchParams(window.location.search);
     const bookId = params.get('book') || '1';
 
-    // 4) Build the PDF URL
+    // 4) Build the PDF path dynamically
     const url = `ebooks/book-${bookId}.pdf`;
 
-    // 5) Prepare PDF.js state
+    // 5) PDF.js rendering state
     let pdfDoc = null, pageNum = 1, pageIsRendering = false, pageNumPending = null;
     const canvas = document.getElementById('canvas'),
           ctx    = canvas.getContext('2d');
 
-    // 6) Render function
+    // 6) Render a page
     function renderPage(num) {
       pageIsRendering = true;
       pdfDoc.getPage(num).then(page => {
         const viewport = page.getViewport({ scale: 1.5 });
-        canvas.height = viewport.height;
-        canvas.width  = viewport.width;
+        canvas.height  = viewport.height;
+        canvas.width   = viewport.width;
         page.render({ canvasContext: ctx, viewport }).promise.then(() => {
           pageIsRendering = false;
-          if (pageNumPending) {
+          if (pageNumPending !== null) {
             renderPage(pageNumPending);
             pageNumPending = null;
           }
@@ -68,24 +66,24 @@
       });
     }
 
-    function queueRender(num) {
+    function queueRenderPage(num) {
       if (pageIsRendering) pageNumPending = num;
       else renderPage(num);
     }
 
-    // 7) Prev/Next handlers
-    document.getElementById('prev').onclick = () => {
+    // 7) Prev/Next controls
+    document.getElementById('prev').addEventListener('click', () => {
       if (pageNum <= 1) return;
       pageNum--;
-      queueRender(pageNum);
-    };
-    document.getElementById('next').onclick = () => {
+      queueRenderPage(pageNum);
+    });
+    document.getElementById('next').addEventListener('click', () => {
       if (pageNum >= pdfDoc.numPages) return;
       pageNum++;
-      queueRender(pageNum);
-    };
+      queueRenderPage(pageNum);
+    });
 
-    // 8) Load the document
+    // 8) Load the PDF document
     pdfjsLib.getDocument(url).promise
       .then(pdf => {
         pdfDoc = pdf;
