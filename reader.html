@@ -74,7 +74,7 @@
 
   <!-- PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <!-- Paddle.js v2 overlay checkout -->
+  <!-- Paddle v2 overlay checkout -->
   <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 </head>
 <body>
@@ -100,37 +100,44 @@
 
   <script>
     window.addEventListener('load', () => {
-      // ====== PADDLE CONFIGURATION ======
+      // ======== PADDLE CONFIGURATION ========
       // 1) Your Client-Side Token (pub_… or sandbox_…)
-      const PADDLE_TOKEN       = 'live_d9709459d165e6395bafefd43a7';
-      // 2) Monthly subscription Price ID (pri_…)
-      const PADDLE_MONTHLY_ID  = 'pri_01jvt7hbtn145k3jm1em2w8eme';
-      // 3) Yearly subscription Price ID (pri_…)
-      const PADDLE_YEARLY_ID   = 'pri_01jvt7mqrtaxmheszs3afz8ex0';
-      // ====================================
+      const PADDLE_TOKEN      = 'live_d9709459d165e6395bafefd43a7';
+      // 2) Your Monthly Price ID (pri_…)
+      const PADDLE_MONTHLY_ID = 'pri_01jvt7hbtn145k3jm1em2w8eme';
+      // 3) Your Yearly Price ID (pri_…)
+      const PADDLE_YEARLY_ID  = 'pri_01jvt7mqrtaxmheszs3afz8ex0';
+      // ========================================
 
-      // Initialize Paddle (v2) — only needs your token
+      // Initialize Paddle (v2)
       Paddle.Initialize({ token: PADDLE_TOKEN });
 
-      // Helper to check subscription
+      // Subscription check
       function isSubscribed() {
         return localStorage.getItem('subscribed') === 'true';
       }
 
-      // Wire subscription buttons
-      document.getElementById('monthly-btn').onclick = () =>
-        Paddle.Checkout.open({ product: PADDLE_MONTHLY_ID });
-      document.getElementById('yearly-btn').onclick = () =>
-        Paddle.Checkout.open({ product: PADDLE_YEARLY_ID });
-
-      // On successful checkout, lock in subscription and resume
-      Paddle.Checkout.Register('Checkout.Complete', data => {
-        if (data.checkout && data.checkout.completed) {
-          localStorage.setItem('subscribed','true');
-          document.getElementById('paywall').style.display = 'none';
-          queueRenderPage(pageNum);
-        }
-      });
+      // Open checkout with successCallback
+      document.getElementById('monthly-btn').onclick = () => {
+        Paddle.Checkout.open({
+          product: PADDLE_MONTHLY_ID,
+          successCallback: () => {
+            localStorage.setItem('subscribed','true');
+            document.getElementById('paywall').style.display = 'none';
+            queueRenderPage(pageNum);
+          }
+        });
+      };
+      document.getElementById('yearly-btn').onclick = () => {
+        Paddle.Checkout.open({
+          product: PADDLE_YEARLY_ID,
+          successCallback: () => {
+            localStorage.setItem('subscribed','true');
+            document.getElementById('paywall').style.display = 'none';
+            queueRenderPage(pageNum);
+          }
+        });
+      };
 
       // ====== PDF.js SETUP ======
       pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -149,7 +156,7 @@
         loader.style.display = on ? 'flex' : 'none';
       }
 
-      // 1) HEAD-check PDF exists then load with PDF.js
+      // 1) HEAD-check then load PDF
       fetch(pdfUrl, { method: 'HEAD' })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
