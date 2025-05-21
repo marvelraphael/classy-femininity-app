@@ -23,6 +23,29 @@
       animation:spin 1s linear infinite;
     }
     @keyframes spin { to { transform:rotate(360deg); } }
+    /* Paywall overlay */
+    #paywall {
+      position:fixed; top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.8);
+      color:#fff;
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:20px;
+      z-index:1001;
+    }
+    #paywall button {
+      margin:10px;
+      padding:10px 20px;
+      background:#b20235;
+      color:#fff;
+      border:none;
+      border-radius:4px;
+      cursor:pointer;
+      font-size:1rem;
+    }
     /* Prev/Next controls */
     .nav {
       position:fixed; bottom:10px; left:50%;
@@ -37,7 +60,6 @@
       border:none; border-radius:4px; cursor:pointer;
     }
     .nav span { margin:0 8px; font-family:sans-serif; }
-    /* Error message */
     .error {
       padding:20px;
       text-align:center;
@@ -45,80 +67,131 @@
       font-family:sans-serif;
     }
   </style>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <!-- Paddle overlay checkout -->
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 </head>
 <body>
+  <!-- Loader -->
   <div id="loader"><div class="spinner"></div></div>
+
+  <!-- Paywall -->
+  <div id="paywall">
+    <p>You’ve reached your free preview (5 pages).<br/>Subscribe to continue reading.</p>
+    <button id="monthly-btn">Subscribe Monthly</button>
+    <button id="yearly-btn">Subscribe Yearly</button>
+  </div>
+
+  <!-- PDF canvas -->
   <canvas id="canvas"></canvas>
+
+  <!-- Paging controls -->
   <div class="nav">
     <button id="prev">◀ Prev</button>
     <span id="page-num">1</span> / <span id="page-count">?</span>
     <button id="next">Next ▶</button>
   </div>
 
-  <!-- 1) PDF.js library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-
   <script>
     window.addEventListener('load', () => {
-      // 2) Worker setup
+      // ====== YOUR PADDLE CONFIG ======
+      // 1) Vendor ID (number)
+      const PADDLE_VENDOR_ID   = 231536;              // ← replace with your Vendor ID
+      // 2) Monthly subscription Price ID (string)
+      const PADDLE_MONTHLY_ID  = 'pri_01jvt7hbtn145k3jm1em2w8eme';// ← replace with your Monthly Price ID
+      // 3) Yearly subscription Price ID (string)
+      const PADDLE_YEARLY_ID   = 'pri_01jvt7mqrtaxmheszs3afz8ex0'; // ← replace with your Yearly Price ID
+      // ================================
+
+      // Initialize Paddle
+      Paddle.Setup({ vendor: PADDLE_VENDOR_ID });
+
+      // Subscription state
+      function isSubscribed() {
+        return localStorage.getItem('subscribed') === 'true';
+      }
+
+      // Hook subscription buttons
+      document.getElementById('monthly-btn').onclick = () => {
+        Paddle.Checkout.open({ product: PADDLE_MONTHLY_ID });
+      };
+      document.getElementById('yearly-btn').onclick = () => {
+        Paddle.Checkout.open({ product: PADDLE_YEARLY_ID });
+      };
+
+      // On successful checkout
+      Paddle.Checkout.Register('Checkout.Complete', data => {
+        if (data.checkout && data.checkout.completed) {
+          localStorage.setItem('subscribed','true');
+          document.getElementById('paywall').style.display = 'none';
+          queueRenderPage(pageNum);
+        }
+      });
+
+      // ====== PDF.js SETUP ======
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-      // 3) Determine which book to load
       const params = new URLSearchParams(location.search);
       const bookId = params.get('book') || '1';
       const pdfUrl = `/ebooks/book-${bookId}.pdf`;
-      console.log('📥 Checking PDF:', pdfUrl);
 
-      // Utility to show/hide loader
+      console.log('Loading PDF:', pdfUrl);
+
       const loader = document.getElementById('loader');
+      const paywall = document.getElementById('paywall');
+
       function showLoader(on) {
         loader.style.display = on ? 'flex' : 'none';
       }
 
-      // 4) First HEAD-check the PDF exists
+      // 1) HEAD-check PDF exists
       fetch(pdfUrl, { method: 'HEAD' })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          console.log('✅ PDF found, loading document...');
-          // 5) Load with PDF.js
           return pdfjsLib.getDocument(pdfUrl).promise;
         })
-        .then(pdf => {
-          console.log('📄 PDF loaded, pages:', pdf.numPages);
-          document.getElementById('page-count').textContent = pdf.numPages;
+        .then(pdfDoc => {
+          console.log('PDF loaded, pages:', pdfDoc.numPages);
+          document.getElementById('page-count').textContent = pdfDoc.numPages;
           showLoader(false);
-          initializeViewer(pdf);
+          initializeViewer(pdfDoc);
         })
         .catch(err => {
-          console.error('❌ PDF load error:', err);
+          console.error('PDF load error:', err);
           showLoader(false);
-          document.body.innerHTML = `<p class="error">Could not load PDF (book ${bookId}): ${err.message}</p>`;
+          document.body.innerHTML = `<p class="error">
+            Could not load PDF (book ${bookId}): ${err.message}
+          </p>`;
         });
 
-      // 6) Initialize paging once PDF is ready
+      // Render logic with paywall
+      let pageNum = 1, pageIsRendering = false, pageNumPending = null;
       function initializeViewer(pdfDoc) {
-        let pageNum = 1,
-            pageIsRendering = false,
-            pageNumPending = null;
-
-        const canvas = document.getElementById('canvas'),
-              ctx    = canvas.getContext('2d');
+        const canvasEl = document.getElementById('canvas');
+        const ctx = canvasEl.getContext('2d');
 
         function renderPage(num) {
+          // Gate at page 6 for unsubscribed users
+          if (num > 5 && !isSubscribed()) {
+            paywall.style.display = 'flex';
+            return;
+          }
+          paywall.style.display = 'none';
           pageIsRendering = true;
           pdfDoc.getPage(num).then(page => {
-            const viewport = page.getViewport({ scale: 1.5 });
-            canvas.height = viewport.height;
-            canvas.width  = viewport.width;
-            page.render({ canvasContext: ctx, viewport })
-                .promise.then(() => {
-                  pageIsRendering = false;
-                  if (pageNumPending !== null) {
-                    renderPage(pageNumPending);
-                    pageNumPending = null;
-                  }
-                });
+            const vp = page.getViewport({ scale: 1.5 });
+            canvasEl.height = vp.height;
+            canvasEl.width  = vp.width;
+            page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
+              pageIsRendering = false;
+              if (pageNumPending !== null) {
+                renderPage(pageNumPending);
+                pageNumPending = null;
+              }
+            });
             document.getElementById('page-num').textContent = num;
           });
         }
@@ -139,7 +212,7 @@
           queueRenderPage(pageNum);
         };
 
-        // Render first page
+        // Draw first page
         renderPage(pageNum);
       }
     });
