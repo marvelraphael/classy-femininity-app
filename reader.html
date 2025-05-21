@@ -31,8 +31,8 @@
     }
   </style>
 
-  <!-- PDF.js core library from CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfjs-dist/3.10.139/pdf.min.js"></script>
+  <!-- 1) Load PDF.js from jsDelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.10.139/build/pdf.min.js"></script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
@@ -43,18 +43,18 @@
   </div>
 
   <script>
-    // Point to the matching worker file
+    // 2) Point to the matching worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdfjs-dist/3.10.139/pdf.worker.min.js';
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.10.139/build/pdf.worker.min.js';
 
-    // Grab the book ID from URL (reader.html?book=3)
+    // 3) Read ?book= from URL
     const params = new URLSearchParams(window.location.search);
     const bookId = params.get('book') || '1';
 
-    // Dynamically construct the PDF path
+    // 4) Build the path dynamically
     const url = `ebooks/book-${bookId}.pdf`;
 
-    // PDF.js rendering state
+    // 5) Prepare rendering state
     let pdfDoc = null,
         pageNum = 1,
         pageIsRendering = false,
@@ -63,7 +63,7 @@
     const canvas = document.getElementById('canvas'),
           ctx    = canvas.getContext('2d');
 
-    // Render a page
+    // 6) Render a given page
     function renderPage(num) {
       pageIsRendering = true;
       pdfDoc.getPage(num).then(page => {
@@ -81,16 +81,13 @@
       });
     }
 
-    // Queue page rendering if another page is in progress
+    // 7) Queue pages if a render is in progress
     function queueRenderPage(num) {
-      if (pageIsRendering) {
-        pageNumPending = num;
-      } else {
-        renderPage(num);
-      }
+      if (pageIsRendering) pageNumPending = num;
+      else renderPage(num);
     }
 
-    // Prev/Next button handlers
+    // 8) Wire up Prev/Next buttons
     document.getElementById('prev').addEventListener('click', () => {
       if (pageNum <= 1) return;
       pageNum--;
@@ -102,7 +99,7 @@
       queueRenderPage(pageNum);
     });
 
-    // Load the PDF
+    // 9) Load the PDF document
     pdfjsLib.getDocument(url).promise
       .then(pdf => {
         pdfDoc = pdf;
