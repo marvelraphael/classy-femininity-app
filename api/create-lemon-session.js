@@ -1,3 +1,4 @@
+// api/create-lemon-session.js
 import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
@@ -14,13 +15,13 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(
-      `https://api.lemonsqueezy.com/v1/stores/${storeId}/checkout/sessions`,
+      `https://api.lemonsqueezy.com/v1/stores/${storeId}/checkout_sessions`,
       {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type':  'application/json',
-          Accept:          'application/json'    // <— tell them we want JSON
+          Accept:          'application/json'
         },
         body: JSON.stringify({
           variant_id:   variantId,
@@ -31,23 +32,16 @@ export default async function handler(req, res) {
       }
     );
 
-    // grab the raw text for debugging
     const text = await response.text();
     console.error('Lemon status:', response.status);
     console.error('Lemon body (snippet):', text.slice(0,200));
 
     if (!response.ok) {
-      // return the snippet so front-end can see it too
-      return res.status(502).json({
-        error: `Lemon ${response.status}: ${text.slice(0,200)}…`
-      });
+      return res.status(502).json({ error: `Lemon ${response.status}: ${text.slice(0,200)}…` });
     }
 
-    // parse the JSON now that we know it’s valid
     const data = JSON.parse(text);
-    return res.status(200).json({
-      url: data.data.attributes.hosted_url
-    });
+    return res.status(200).json({ url: data.data.attributes.hosted_url });
 
   } catch (err) {
     console.error('create-session exception', err);
