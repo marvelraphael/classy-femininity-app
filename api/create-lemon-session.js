@@ -7,26 +7,20 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed');
   }
 
-  const { variantId } = req.body;                          // Incoming from the front end
-  const book          = req.query.book;                     // preserve ?book=1
-  const storeId       = process.env.LEMON_STORE_ID;         // e.g. "183182"
-  const apiKey        = process.env.LEMON_SECRET_KEY;       // your sk_live_… or sk_test_…
-  const appUrl        = process.env.APP_URL;                // "https://your-app.vercel.app"
+  const { variantId } = req.body;
+  const book          = req.query.book;
+  const storeId       = process.env.LEMON_STORE_ID;
+  const apiKey        = process.env.LEMON_SECRET_KEY;
+  const appUrl        = process.env.APP_URL;
 
-  // Build the JSON:API–compliant payload
+  // *** NEW: attributes-only JSON:API payload ***
   const payload = {
     data: {
       type: "checkouts",
-      relationships: {
-        store: {
-          data: { type: "stores", id: storeId }
-        },
-        variant: {
-          data: { type: "variants", id: variantId }
-        }
-      },
       attributes: {
-        embed: true,  // opens the overlay instead of a full redirect
+        store_id:     storeId,
+        variant_id:   variantId,
+        embed:        true,
         redirect_url: `${appUrl}/reader.html?book=${book}&subscribed=1`,
         cancel_url:   `${appUrl}/reader.html?book=${book}`
       }
@@ -52,13 +46,13 @@ export default async function handler(req, res) {
     console.error("🛠️ Lemon body snippet:", text.slice(0,200));
 
     if (!response.ok) {
-      return res.status(502).json({ error: `Lemon ${response.status}: ${text.slice(0,200)}…` });
+      return res
+        .status(502)
+        .json({ error: `Lemon ${response.status}: ${text.slice(0,200)}…` });
     }
 
-    // Parse JSON:API response
     const json = JSON.parse(text);
-    const url  = json.data.attributes.url;  // the embedded checkout URL
-
+    const url  = json.data.attributes.url;
     return res.status(200).json({ url });
   }
   catch (err) {
