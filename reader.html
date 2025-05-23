@@ -5,63 +5,29 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Reader — Classy Femininity</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; font-family: sans-serif; }
-
-    /* Loader overlay */
-    #loader {
-      position: fixed; inset: 0;
-      background: rgba(255,255,255,0.95);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 1000;
-    }
-    .spinner {
-      border: 6px solid #eee;
-      border-top: 6px solid #b20235;
-      border-radius: 50%;
-      width: 48px; height: 48px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Paywall overlay */
-    #paywall {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.85); color: #fff;
-      display: none; flex-direction: column;
-      align-items: center; justify-content: center;
-      text-align: center; padding: 24px; z-index: 1001;
-    }
-    #paywall a {
-      display: inline-block;
-      margin: 12px 6px; padding: 10px 20px;
-      background: #b20235; color: #fff;
-      text-decoration: none; border-radius: 4px;
-      font-size: 1rem;
-    }
-
-    /* PDF canvas */
-    #canvas { display: block; width: 100%; }
-
-    /* Prev/Next nav */
-    .nav {
-      position: fixed; bottom: 16px; left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255,255,255,0.9);
-      padding: 8px 16px; border-radius: 6px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      display: flex; align-items: center; z-index: 500;
-    }
-    .nav button {
-      margin: 0 8px; padding: 6px 12px;
-      background: #b20235; color: #fff;
-      border: none; border-radius: 4px; cursor: pointer;
-    }
-    .nav span { font-size: 1rem; margin: 0 4px; }
-
-    .error {
-      padding: 24px; text-align: center; color: red;
-    }
+    /* …your existing CSS… */
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html, body { height:100%; font-family:sans-serif; }
+    #loader { position:fixed; inset:0; background:rgba(255,255,255,0.95);
+      display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .spinner { border:6px solid #eee; border-top:6px solid #b20235;
+      border-radius:50%; width:48px; height:48px; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    #paywall { position:fixed; inset:0; background:rgba(0,0,0,0.85); color:#fff;
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; padding:24px; z-index:1001; }
+    #paywall a { display:inline-block; margin:12px 6px; padding:10px 20px;
+      background:#b20235; color:#fff; text-decoration:none; border-radius:4px;
+      font-size:1rem; }
+    #canvas { display:block; width:100%; }
+    .nav { position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+      background:rgba(255,255,255,0.9); padding:8px 16px; border-radius:6px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; align-items:center;
+      z-index:500; }
+    .nav button { margin:0 8px; padding:6px 12px; background:#b20235; color:#fff;
+      border:none; border-radius:4px; cursor:pointer; }
+    .nav span { font-size:1rem; margin:0 4px; }
+    .error { padding:24px; text-align:center; color:red; }
   </style>
 
   <!-- PDF.js -->
@@ -75,22 +41,13 @@
 
   <!-- Paywall -->
   <div id="paywall">
-    <p>
-      You’ve reached your free preview (5 pages).<br/>
-      Subscribe to continue reading.
-    </p>
-    <a
-      href="https://app.lemonsqueezy.com/checkout/buy/816280?embed=1"
-      class="lemonsqueezy-button"
-      id="monthly-btn"
-    >
+    <p>You’ve reached your free preview (5 pages).<br/>Subscribe to continue reading.</p>
+    <a href="https://app.lemonsqueezy.com/checkout/buy/816280?embed=1"
+       class="lemonsqueezy-button" id="monthly-btn">
       Subscribe Monthly
     </a>
-    <a
-      href="https://app.lemonsqueezy.com/checkout/buy/816279?embed=1"
-      class="lemonsqueezy-button"
-      id="yearly-btn"
-    >
+    <a href="https://app.lemonsqueezy.com/checkout/buy/816279?embed=1"
+       class="lemonsqueezy-button" id="yearly-btn">
       Subscribe Yearly
     </a>
   </div>
@@ -106,112 +63,110 @@
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // 1) Parse URL params
-      const params = new URLSearchParams(location.search);
-      const bookId = params.get('book') || '1';
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1) Parse URL & subscription flag
+    const params = new URLSearchParams(location.search);
+    const bookId = params.get('book') || '1';
+    if (params.get('subscribed') === '1') {
+      localStorage.setItem('subscribed','true');
+      history.replaceState(null, '', `reader.html?book=${bookId}`);
+    }
 
-      // If redirected back with ?subscribed=1, unlock permanently
-      if (params.get('subscribed') === '1') {
-        localStorage.setItem('subscribed', 'true');
-        history.replaceState(null, '', `reader.html?book=${bookId}`);
-      }
+    // 2) Hook Lemon Squeezy success
+    window.addEventListener('Checkout.Success', () => {
+      localStorage.setItem('subscribed','true');
+      document.getElementById('paywall').style.display = 'none';
+      queueRenderPage(pageNum);
+    });
 
-      // 2) Listen for Lemon Squeezy success event
-      window.addEventListener('Checkout.Success', () => {
-        localStorage.setItem('subscribed', 'true');
-        document.getElementById('paywall').style.display = 'none';
-        queueRenderPage(pageNum);
+    // 3) Setup PDF.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+    const pdfUrl      = `/ebooks/book-${bookId}.pdf`;
+    const loader      = document.getElementById('loader');
+    const paywall     = document.getElementById('paywall');
+    const canvas      = document.getElementById('canvas');
+    const ctx         = canvas.getContext('2d');
+    const prevBtn     = document.getElementById('prev');
+    const nextBtn     = document.getElementById('next');
+    const pageNumEl   = document.getElementById('page-num');
+    const pageCountEl = document.getElementById('page-count');
+
+    function showLoader(on) {
+      loader.style.display = on ? 'flex' : 'none';
+    }
+
+    // Outer-scope PDF document reference
+    let pdfDoc = null;
+    let pageNum = 1,
+        pageIsRendering = false,
+        pageNumPending = null;
+
+    // Fetch & load the PDF
+    fetch(pdfUrl, { method: 'HEAD' })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return pdfjsLib.getDocument(pdfUrl).promise;
+      })
+      .then(doc => {
+        pdfDoc = doc;
+        pageCountEl.textContent = pdfDoc.numPages;
+        showLoader(false);
+        initializeViewer();
+      })
+      .catch(err => {
+        console.error(err);
+        showLoader(false);
+        document.body.innerHTML =
+          `<p class="error">Could not load PDF: ${err.message}</p>`;
       });
 
-      // 3) PDF.js setup
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-
-      const pdfUrl    = `/ebooks/book-${bookId}.pdf`;
-      const loader    = document.getElementById('loader');
-      const paywall   = document.getElementById('paywall');
-      const canvas    = document.getElementById('canvas');
-      const ctx       = canvas.getContext('2d');
-      const prevBtn   = document.getElementById('prev');
-      const nextBtn   = document.getElementById('next');
-      const pageNumEl   = document.getElementById('page-num');
-      const pageCountEl = document.getElementById('page-count');
-
-      function showLoader(show) {
-        loader.style.display = show ? 'flex' : 'none';
+    // Render a page, gating after page 5
+    function renderPage(num) {
+      if (num > 5 && localStorage.getItem('subscribed') !== 'true') {
+        paywall.style.display = 'flex';
+        return;
       }
+      paywall.style.display = 'none';
+      pageIsRendering = true;
 
-      // HEAD-check then load PDF
-      fetch(pdfUrl, { method: 'HEAD' })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return pdfjsLib.getDocument(pdfUrl).promise;
-        })
-        .then(pdfDoc => {
-          pageCountEl.textContent = pdfDoc.numPages;
-          showLoader(false);
-          initializeViewer(pdfDoc);
-        })
-        .catch(err => {
-          console.error(err);
-          showLoader(false);
-          document.body.innerHTML =
-            `<p class="error">Could not load PDF: ${err.message}</p>`;
+      pdfDoc.getPage(num).then(page => {
+        const vp = page.getViewport({ scale: 1.5 });
+        canvas.width  = vp.width;
+        canvas.height = vp.height;
+        page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
+          pageIsRendering = false;
+          if (pageNumPending !== null) {
+            renderPage(pageNumPending);
+            pageNumPending = null;
+          }
         });
+        pageNumEl.textContent = num;
+      });
+    }
 
-      // 4) Render & gate logic
-      let pageNum = 1,
-          pageIsRendering = false,
-          pageNumPending = null;
+    function queueRenderPage(num) {
+      pageIsRendering ? pageNumPending = num : renderPage(num);
+    }
 
-      function renderPage(num) {
-        // Gate pages >5
-        if (num > 5 && localStorage.getItem('subscribed') !== 'true') {
-          paywall.style.display = 'flex';
-          return;
+    // Set up prev/next buttons & start on page 1
+    function initializeViewer() {
+      prevBtn.onclick = () => {
+        if (pageNum > 1) {
+          pageNum--;
+          queueRenderPage(pageNum);
         }
-        paywall.style.display = 'none';
-        pageIsRendering = true;
-
-        pdfDoc.getPage(num).then(page => {
-          const vp = page.getViewport({ scale: 1.5 });
-          canvas.height = vp.height;
-          canvas.width  = vp.width;
-          page.render({
-            canvasContext: ctx,
-            viewport: vp
-          }).promise.then(() => {
-            pageIsRendering = false;
-            if (pageNumPending !== null) {
-              renderPage(pageNumPending);
-              pageNumPending = null;
-            }
-          });
-          pageNumEl.textContent = num;
-        });
-      }
-
-      function queueRenderPage(num) {
-        pageIsRendering ? pageNumPending = num : renderPage(num);
-      }
-
-      function initializeViewer(pdfDoc) {
-        prevBtn.onclick = () => {
-          if (pageNum > 1) {
-            pageNum--;
-            queueRenderPage(pageNum);
-          }
-        };
-        nextBtn.onclick = () => {
-          if (pageNum < pdfDoc.numPages) {
-            pageNum++;
-            queueRenderPage(pageNum);
-          }
-        };
-        renderPage(pageNum);
-      }
-    });
+      };
+      nextBtn.onclick = () => {
+        if (pageNum < pdfDoc.numPages) {
+          pageNum++;
+          queueRenderPage(pageNum);
+        }
+      };
+      renderPage(pageNum);
+    }
+  });
   </script>
 </body>
 </html>
