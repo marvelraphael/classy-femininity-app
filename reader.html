@@ -7,8 +7,10 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; font-family: sans-serif; }
+
+    /* Loader overlay */
     #loader {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      position: fixed; inset: 0;
       background: rgba(255,255,255,0.95);
       display: flex; align-items: center; justify-content: center;
       z-index: 1000;
@@ -22,8 +24,9 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* Paywall overlay */
     #paywall {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      position: fixed; inset: 0;
       background: rgba(0,0,0,0.85); color: #fff;
       display: none; flex-direction: column;
       align-items: center; justify-content: center;
@@ -36,8 +39,10 @@
       font-size: 1rem;
     }
 
+    /* PDF canvas */
     #canvas { display: block; width: 100%; }
 
+    /* Prev/Next nav */
     .nav {
       position: fixed; bottom: 16px; left: 50%;
       transform: translateX(-50%);
@@ -60,20 +65,22 @@
 
   <!-- PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <!-- Paddle v2 overlay -->
-  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 </head>
 <body>
+  <!-- Loader -->
   <div id="loader"><div class="spinner"></div></div>
 
+  <!-- Paywall -->
   <div id="paywall">
     <p>You’ve reached your free preview (5 pages).<br/>Subscribe to continue reading.</p>
     <button id="monthly-btn">Subscribe Monthly</button>
     <button id="yearly-btn">Subscribe Yearly</button>
   </div>
 
+  <!-- PDF canvas -->
   <canvas id="canvas"></canvas>
 
+  <!-- Prev/Next nav -->
   <div class="nav">
     <button id="prev">◀ Prev</button>
     <span id="page-num">1</span> / <span id="page-count">?</span>
@@ -82,53 +89,54 @@
 
   <script>
   window.addEventListener('load', () => {
-    // ——— Paddle setup ———
-    Paddle.Environment.set('sandbox'); // change to 'production' when live
-    Paddle.Initialize({
-      token: 'test_c1d926aee93e8ff9dbd35392581' // your client-side token
-    });
-
-    const MONTHLY_ID = 'pri_01jvthzpme46yzb6g6b7er4jnk';
-    const YEARLY_ID  = 'pri_01jvtj0dch0kb39g9rej1qexyg';
-
-    function onSubscribed() {
+    // Extract book and subscription flag from URL
+    const params = new URLSearchParams(location.search);
+    const bookId = params.get('book') || '1';
+    if (params.get('subscribed') === '1') {
       localStorage.setItem('subscribed', 'true');
-      document.getElementById('paywall').style.display = 'none';
-      queueRenderPage(pageNum);
+      // optionally remove query param
+      history.replaceState(null, '', `reader.html?book=${bookId}`);
     }
 
-    document.getElementById('monthly-btn').onclick = () => {
-      Paddle.Checkout.open({
-        product:         MONTHLY_ID,
-        token:           'test_c1d926aee93e8ff9dbd35392581',
-        successCallback: onSubscribed
-      });
-    };
-    document.getElementById('yearly-btn').onclick = () => {
-      Paddle.Checkout.open({
-        product:         YEARLY_ID,
-        token:           'test_c1d926aee93e8ff9dbd35392581',
-        successCallback: onSubscribed
-      });
-    };
-    // ————————————————
+    // Lemon Squeezy variant IDs
+    const MONTHLY_VARIANT = '816280';
+    const YEARLY_VARIANT  = '816279';
 
-    // ——— PDF.js + paywall logic ———
+    // Open Lemon Squeezy checkout session
+    async function openLemon(variantId) {
+      try {
+        const res = await fetch(`/api/create-lemon-session?book=${bookId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variantId })
+        });
+        if (!res.ok) throw await res.json();
+        const { url } = await res.json();
+        window.location.href = url;
+      } catch (err) {
+        console.error('Checkout error', err);
+        alert('Unable to start checkout. Please try again.');
+      }
+    }
+
+    document.getElementById('monthly-btn').onclick = () =>
+      openLemon(MONTHLY_VARIANT);
+    document.getElementById('yearly-btn').onclick = () =>
+      openLemon(YEARLY_VARIANT);
+
+    // PDF.js + paywall logic
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-    const params  = new URLSearchParams(location.search),
-          bookId  = params.get('book') || '1',
-          pdfUrl  = `/ebooks/book-${bookId}.pdf`;
-
-    const loader   = document.getElementById('loader'),
-          paywall  = document.getElementById('paywall'),
-          canvas   = document.getElementById('canvas'),
-          ctx      = canvas.getContext('2d'),
-          prevBtn  = document.getElementById('prev'),
-          nextBtn  = document.getElementById('next'),
-          pageNumEl   = document.getElementById('page-num'),
-          pageCountEl = document.getElementById('page-count');
+    const pdfUrl = `/ebooks/book-${bookId}.pdf`;
+    const loader = document.getElementById('loader');
+    const paywall = document.getElementById('paywall');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const pageNumEl = document.getElementById('page-num');
+    const pageCountEl = document.getElementById('page-count');
 
     function showLoader(on) {
       loader.style.display = on ? 'flex' : 'none';
@@ -191,7 +199,6 @@
 
       renderPage(pageNum);
     }
-    // ————————————————————————————————
   });
   </script>
 </body>
