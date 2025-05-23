@@ -1,67 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Reader — Classy Femininity</title>
   <style>
-    * { box-sizing: border-box; margin:0; padding:0; }
-    html, body { height:100%; font-family: sans-serif; }
-
-    /* Loader */
-    #loader {
-      position:fixed; inset:0;
-      background:rgba(255,255,255,0.95);
-      display:flex; align-items:center; justify-content:center;
-      z-index:1000;
-    }
-    .spinner {
-      border:6px solid #eee;
-      border-top:6px solid #b20235;
-      border-radius:50%;
-      width:48px; height:48px;
-      animation:spin 1s linear infinite;
-    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html, body { height:100%; font-family:sans-serif; }
+    #loader { position:fixed; inset:0; background:rgba(255,255,255,0.95); display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .spinner { border:6px solid #eee; border-top:6px solid #b20235; border-radius:50%; width:48px; height:48px; animation:spin 1s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
-
-    /* Paywall */
-    #paywall {
-      position:fixed; inset:0;
-      background:rgba(0,0,0,0.85); color:#fff;
-      display:none; flex-direction:column;
-      align-items:center; justify-content:center;
-      text-align:center; padding:24px; z-index:1001;
-    }
-    #paywall a {
-      display:inline-block;
-      margin:12px 6px; padding:10px 20px;
-      background:#b20235; color:#fff;
-      text-decoration:none; border-radius:4px;
-      font-size:1rem;
-    }
-
-    /* PDF Canvas */
+    #paywall { position:fixed; inset:0; background:rgba(0,0,0,0.85); color:#fff; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; z-index:1001; }
+    #paywall a { display:inline-block; margin:12px 6px; padding:10px 20px; background:#b20235; color:#fff; text-decoration:none; border-radius:4px; font-size:1rem; }
     #canvas { display:block; width:100%; }
-
-    /* Prev/Next */
-    .nav {
-      position:fixed; bottom:16px; left:50%;
-      transform:translateX(-50%);
-      background:rgba(255,255,255,0.9);
-      padding:8px 16px; border-radius:6px;
-      box-shadow:0 2px 4px rgba(0,0,0,0.1);
-      display:flex; align-items:center; z-index:500;
-    }
-    .nav button {
-      margin:0 8px; padding:6px 12px;
-      background:#b20235; color:#fff;
-      border:none; border-radius:4px; cursor:pointer;
-    }
+    .nav { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.9); padding:8px 16px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; align-items:center; z-index:500; }
+    .nav button { margin:0 8px; padding:6px 12px; background:#b20235; color:#fff; border:none; border-radius:4px; cursor:pointer; }
     .nav span { font-size:1rem; margin:0 4px; }
-
-    .error {
-      padding:24px; text-align:center; color:red;
-    }
+    .error { padding:24px; text-align:center; color:red; }
   </style>
 
   <!-- PDF.js -->
@@ -70,28 +24,25 @@
   <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
 </head>
 <body>
-  <!-- Loader -->
   <div id="loader"><div class="spinner"></div></div>
 
-  <!-- Paywall -->
+  <!-- Paywall with your real plan links -->
   <div id="paywall">
     <p>You’ve reached your free preview (5 pages).<br/>Subscribe to continue reading.</p>
     <a
-      href="https://app.lemonsqueezy.com/checkout/buy/816280?embed=1"
-      class="lemonsqueezy-button"
-      id="monthly-btn"
-    >Subscribe Monthly</a>
-    <a
-      href="https://app.lemonsqueezy.com/checkout/buy/816279?embed=1"
+      href="https://classyfemininity.lemonsqueezy.com/checkout/buy/1780d2f3-5d6e-4e63-a9f8-b9195599568f?embed=1"
       class="lemonsqueezy-button"
       id="yearly-btn"
     >Subscribe Yearly</a>
+    <a
+      href="https://classyfemininity.lemonsqueezy.com/checkout/buy/1c5627ce-5495-4e43-9bfa-1cd3b9310f3a?embed=1"
+      class="lemonsqueezy-button"
+      id="monthly-btn"
+    >Subscribe Monthly</a>
   </div>
 
-  <!-- PDF canvas -->
   <canvas id="canvas"></canvas>
 
-  <!-- Prev/Next nav -->
   <div class="nav">
     <button id="prev">◀ Prev</button>
     <span id="page-num">1</span> / <span id="page-count">?</span>
@@ -100,24 +51,19 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // 1) URL params
       const params = new URLSearchParams(location.search);
       const bookId = params.get('book') || '1';
-
-      // If returned with ?subscribed=1, unlock
       if (params.get('subscribed') === '1') {
         localStorage.setItem('subscribed','true');
         history.replaceState(null,'',`reader.html?book=${bookId}`);
       }
 
-      // 2) Lemon Squeezy success event
       window.addEventListener('Checkout.Success', () => {
         localStorage.setItem('subscribed','true');
         document.getElementById('paywall').style.display = 'none';
         queueRenderPage(pageNum);
       });
 
-      // 3) PDF.js setup
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -131,17 +77,15 @@
       const pageNumEl   = document.getElementById('page-num');
       const pageCountEl = document.getElementById('page-count');
 
-      function showLoader(show) {
-        loader.style.display = show ? 'flex' : 'none';
+      function showLoader(on) {
+        loader.style.display = on ? 'flex' : 'none';
       }
 
-      // Outer-scope PDF doc & paging
-      let pdfDoc = null;
-      let pageNum = 1;
-      let pageIsRendering = false;
-      let pageNumPending = null;
+      let pdfDoc = null,
+          pageNum = 1,
+          pageIsRendering = false,
+          pageNumPending = null;
 
-      // Load PDF
       fetch(pdfUrl, { method: 'HEAD' })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -160,7 +104,6 @@
             `<p class="error">Could not load PDF: ${err.message}</p>`;
         });
 
-      // Render a page with gating
       function renderPage(num) {
         if (num > 5 && localStorage.getItem('subscribed') !== 'true') {
           paywall.style.display = 'flex';
@@ -170,10 +113,10 @@
         pageIsRendering = true;
 
         pdfDoc.getPage(num).then(page => {
-          const viewport = page.getViewport({ scale: 1.5 });
-          canvas.width  = viewport.width;
-          canvas.height = viewport.height;
-          page.render({ canvasContext: ctx, viewport }).promise.then(() => {
+          const vp = page.getViewport({ scale:1.5 });
+          canvas.width  = vp.width;
+          canvas.height = vp.height;
+          page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
             pageIsRendering = false;
             if (pageNumPending !== null) {
               renderPage(pageNumPending);
