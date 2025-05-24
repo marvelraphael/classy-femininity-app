@@ -1,0 +1,8 @@
+{
+  "name": "classy-femininity-app",
+  "version": "1.0.0",
+  "dependencies": {
+    "node-fetch": "^2.6.1",
+    "micro": "^9.3.4"
+  }
+}
