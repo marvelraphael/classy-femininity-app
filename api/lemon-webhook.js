@@ -1,3 +1,5 @@
+console.log('🔔 [Webhook] Event received:', req.body.event, 'for user:', req.body.data.attributes.user_id);
+}
 // api/lemon-webhook.js
 
 const { buffer } = require('micro');
