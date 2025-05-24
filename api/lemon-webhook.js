@@ -1,12 +1,12 @@
 // api/lemon-webhook.js
-import { buffer } from 'micro';
-import crypto      from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+import { buffer }           from 'micro';
+import crypto                from 'crypto';
+import { createClient }      from '@supabase/supabase-js';
 
-// Disable Vercel’s built-in body parser so we can verify the raw payload
+// 1) Turn off Vercel’s default JSON parser
 export const config = { api: { bodyParser: false } };
 
-// Supabase client with service role key (bypasses RLS)
+// 2) Supabase client using your SERVICE_ROLE key (bypasses RLS)
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -14,17 +14,16 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   try {
-    // 1) Grab raw body
+    // 3) Grab the raw request bytes
     const rawBody = await buffer(req);
 
-    // 2) Verify signature header
+    // 4) Verify HMAC against the correct header name
     const sigHeader = req.headers['x-signature'] || req.headers['X-Signature'];
     if (!sigHeader) {
       console.warn('❌ Webhook: Missing X-Signature header');
-      return res.status(400).send('Missing signature header');
+      return res.status(400).send('Missing signature');
     }
 
-    // 3) Compute expected HMAC
     const expected = crypto
       .createHmac('sha256', process.env.LEMON_WEBHOOK_SECRET)
       .update(rawBody)
@@ -38,34 +37,33 @@ export default async function handler(req, res) {
       return res.status(400).send('Invalid signature');
     }
 
-    // 4) Parse JSON
-    const json = JSON.parse(rawBody.toString());
-    console.log('🔔 Webhook payload:', JSON.stringify(json));
+    // 5) Parse and log
+    const payload = JSON.parse(rawBody.toString());
+    console.log('🔔 Webhook payload:', JSON.stringify(payload));
 
-    // 5) Extract event & user_id safely
-    const event = json.event;
-    const userId = json.data?.attributes?.user_id;
-    if (!userId) {
-      console.warn('❌ Webhook: Missing data.attributes.user_id');
-      return res.status(400).send('Missing user_id');
+    // 6) Pull out the event name and customer_id
+    const eventName  = payload.meta?.event_name;
+    const custId     = payload.data?.attributes?.customer_id;
+    if (!eventName || !custId) {
+      console.warn('❌ Webhook: Missing event_name or customer_id');
+      return res.status(400).send('Bad webhook payload');
     }
-    const userKey = userId.toString();
+    const userKey = String(custId);
 
-    // 6) Update Supabase
-    if (['subscription_created','subscription_activated'].includes(event)) {
+    // 7) Update your users table
+    if (['subscription_created','subscription_activated','subscription_updated'].includes(eventName)) {
       await supabase
         .from('users')
         .upsert({ id: userKey, subscribed: true });
-    } else if (['subscription_expired','subscription_cancelled'].includes(event)) {
+    } else if (['subscription_expired','subscription_cancelled'].includes(eventName)) {
       await supabase
         .from('users')
         .update({ subscribed: false })
         .eq('id', userKey);
     } else {
-      console.log(`ℹ️ Webhook: Unhandled event type "${event}"`);
+      console.log(`ℹ️ Webhook: Ignoring event "${eventName}"`);
     }
 
-    // 7) Acknowledge success
     return res.status(200).send('OK');
   } catch (err) {
     console.error('❌ Webhook handler error:', err);
