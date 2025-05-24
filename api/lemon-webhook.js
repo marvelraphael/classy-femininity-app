@@ -1,3 +1,7 @@
+export default async function handler(req, res) {
+  console.log('🔔 Webhook received:', req.headers['x-ls-signature'], req.body.event);
+  // …rest of your verification + handling code…
+}
 // api/lemon-webhook.js
 import crypto from 'crypto';
 
