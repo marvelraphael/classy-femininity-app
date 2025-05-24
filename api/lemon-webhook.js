@@ -1,41 +1,75 @@
-export default async function handler(req, res) {
-  console.log('🔔 Webhook received:', req.headers['x-ls-signature'], req.body.event);
-  // …rest of your verification + handling code…
-}
 // api/lemon-webhook.js
-import crypto from 'crypto';
 
-export default async function handler(req, res) {
-  // 1) Grab the signature and your secret
-  const signature = req.headers['x-ls-signature'];
-  const secret    = process.env.LEMON_WEBHOOK_SECRET;
-  const payload   = JSON.stringify(req.body);
+const { buffer } = require('micro');
+const crypto     = require('crypto');
 
-  // 2) Verify HMAC-SHA256
-  const hash = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  if (hash !== signature) {
-    console.warn('Invalid webhook signature', signature, hash);
-    return res.status(400).send('Invalid signature');
+/**
+ * Disable Vercel's default body parser so we can verify the raw payload.
+ */
+module.exports.config = {
+  api: {
+    bodyParser: false
+  }
+};
+
+module.exports = async function handler(req, res) {
+  // Only allow POST
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).end('Method Not Allowed');
   }
 
-  // 3) Handle the event
-  const { event, data } = req.body;
-  const userId = data.attributes.user_id; // or however you identify the subscriber
+  try {
+    // 1) Read raw request body
+    const rawBody   = (await buffer(req)).toString('utf8');
+    const signature = req.headers['x-ls-signature'];
+    const secret    = process.env.LEMON_WEBHOOK_SECRET;
+    
+    // 2) Compute HMAC-SHA256 and compare
+    const expected = crypto
+      .createHmac('sha256', secret)
+      .update(rawBody)
+      .digest('hex');
+    if (expected !== signature) {
+      console.warn('⚠️ Invalid webhook signature', { expected, signature });
+      return res.status(400).end('Invalid signature');
+    }
 
-  if (event === 'subscription_created' || event === 'subscription_activated') {
-    // Mark them subscribed in your DB
-    // await db.users.update(userId, { subscribed: true });
-  } else if (event === 'subscription_expired' || event === 'subscription_cancelled') {
-    // Mark them unsubscribed
-    // await db.users.update(userId, { subscribed: false });
-  } else if (event === 'payment_failed') {
-    // Optionally flag dunning state
-    // await db.users.update(userId, { past_due: true });
-  } else if (event === 'payment_succeeded') {
-    // Clear any dunning flags
-    // await db.users.update(userId, { past_due: false, subscribed: true });
+    // 3) Parse JSON after verification
+    const payload = JSON.parse(rawBody);
+    console.log('🔔 Webhook event received:', payload.event);
+
+    // 4) Handle specific events
+    const { event, data } = payload;
+    const userId = data.attributes.user_id; // adjust if your payload uses a different key
+
+    switch (event) {
+      case 'subscription_created':
+      case 'subscription_activated':
+        // TODO: mark user as subscribed in your database
+        console.log(`→ Mark user ${userId} SUBSCRIBED`);
+        break;
+      case 'subscription_expired':
+      case 'subscription_cancelled':
+        // TODO: mark user as unsubscribed
+        console.log(`→ Mark user ${userId} UNSUBSCRIBED`);
+        break;
+      case 'payment_failed':
+        // TODO: handle dunning state
+        console.log(`→ Payment failed for user ${userId}`);
+        break;
+      case 'payment_succeeded':
+        // TODO: clear any dunning flags / re-activate subscription
+        console.log(`→ Payment succeeded for user ${userId}`);
+        break;
+      default:
+        console.log(`→ Unhandled event type: ${event}`);
+    }
+
+    // 5) Respond 200 OK
+    return res.status(200).end('OK');
+  } catch (err) {
+    console.error('❌ Webhook handler error:', err);
+    return res.status(500).end('Internal Server Error');
   }
-
-  // 4) Ack the webhook
-  res.status(200).send('OK');
-}
+};
