@@ -8,15 +8,16 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  // 1) Read & parse the cookie header
+  // 1) Parse cookies
   const cookies = parse(req.headers.cookie || '');
   const userId  = cookies.userId;
+
+  // 2) If no userId, just return subscribed: false (200 OK)
   if (!userId) {
-    // no userId cookie → not logged in or not subscribed yet
-    return res.status(401).json({ subscribed: false });
+    return res.status(200).json({ subscribed: false });
   }
 
-  // 2) Lookup in Supabase
+  // 3) Otherwise check your DB
   const { data, error } = await supabase
     .from('users')
     .select('subscribed')
@@ -25,9 +26,10 @@ export default async function handler(req, res) {
 
   if (error) {
     console.error('❌ check-sub error:', error);
-    return res.status(500).json({ error: error.message });
+    // Still return 200 but mark as unsubscribed on error
+    return res.status(200).json({ subscribed: false });
   }
 
-  // 3) Return the flag
+  // 4) Return the true flag
   res.status(200).json({ subscribed: !!data.subscribed });
 }
