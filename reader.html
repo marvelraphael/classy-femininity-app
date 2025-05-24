@@ -1,21 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Reader — Classy Femininity</title>
   <style>
-    * { box-sizing:border-box; margin:0; padding:0; }
-    html, body { height:100%; font-family:sans-serif; }
-    #loader { position:fixed; inset:0; background:rgba(255,255,255,0.95); display:flex; align-items:center; justify-content:center; z-index:1000; }
-    .spinner { border:6px solid #eee; border-top:6px solid #b20235; border-radius:50%; width:48px; height:48px; animation:spin 1s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    #paywall { position:fixed; inset:0; background:rgba(0,0,0,0.85); color:#fff; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; z-index:1001; }
-    #paywall a { display:inline-block; margin:12px 6px; padding:10px 20px; background:#b20235; color:#fff; text-decoration:none; border-radius:4px; font-size:1rem; }
-    #canvas { display:block; width:100%; }
-    .nav { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.9); padding:8px 16px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; align-items:center; z-index:500; }
-    .nav button { margin:0 8px; padding:6px 12px; background:#b20235; color:#fff; border:none; border-radius:4px; cursor:pointer; }
-    .nav span { font-size:1rem; margin:0 4px; }
-    .error { padding:24px; text-align:center; color:red; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: sans-serif; }
+
+    /* Loader overlay */
+    #loader {
+      position: fixed; inset: 0;
+      background: rgba(255,255,255,0.95);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .spinner {
+      border: 6px solid #eee;
+      border-top: 6px solid #b20235;
+      border-radius: 50%;
+      width: 48px; height: 48px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Paywall overlay */
+    #paywall {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85); color: #fff;
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 24px; z-index: 1001;
+    }
+    #paywall a {
+      display: inline-block;
+      margin: 12px 6px; padding: 10px 20px;
+      background: #b20235; color: #fff;
+      text-decoration: none; border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    /* PDF canvas */
+    #canvas { display: block; width: 100%; }
+
+    /* Prev/Next nav */
+    .nav {
+      position: fixed; bottom: 16px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.9);
+      padding: 8px 16px; border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex; align-items: center; z-index: 500;
+    }
+    .nav button {
+      margin: 0 8px; padding: 6px 12px;
+      background: #b20235; color: #fff;
+      border: none; border-radius: 4px; cursor: pointer;
+    }
+    .nav span { font-size: 1rem; margin: 0 4px; }
+
+    .error {
+      padding: 24px; text-align: center; color: red;
+    }
   </style>
 
   <!-- PDF.js -->
@@ -24,33 +70,34 @@
   <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
 </head>
 <body>
+  <!-- Loader -->
   <div id="loader"><div class="spinner"></div></div>
 
- <!-- Paywall -->
-<div id="paywall">
-  <p>You’ve reached your free preview (5 pages).<br/>Subscribe to continue reading.</p>
+  <!-- Paywall -->
+  <div id="paywall">
+    <p>You’ve reached your free preview (5 pages).<br/>Subscribe to continue reading.</p>
+    <!-- Yearly (variant 816279) -->
+    <a
+      href="https://classyfemininity.lemonsqueezy.com/checkout/buy/1780d2f3-5d6e-4e63-a9f8-b9195599568f?enabled=816279&embed=1"
+      class="lemonsqueezy-button"
+      id="yearly-btn"
+    >
+      Subscribe Yearly
+    </a>
+    <!-- Monthly (variant 816280) -->
+    <a
+      href="https://classyfemininity.lemonsqueezy.com/checkout/buy/1c5627ce-5495-4e43-9bfa-1cd3b9310f3a?enabled=816280&embed=1"
+      class="lemonsqueezy-button"
+      id="monthly-btn"
+    >
+      Subscribe Monthly
+    </a>
+  </div>
 
-  <!-- Yearly (variant 816279) -->
-  <a
-    href="https://classyfemininity.lemonsqueezy.com/checkout/buy/1780d2f3-5d6e-4e63-a9f8-b9195599568f?enabled=816279&embed=1"
-    class="lemonsqueezy-button"
-    id="yearly-btn"
-  >
-    Subscribe Yearly
-  </a>
-
-  <!-- Monthly (variant 816280) -->
-  <a
-    href="https://classyfemininity.lemonsqueezy.com/checkout/buy/1c5627ce-5495-4e43-9bfa-1cd3b9310f3a?enabled=816280&embed=1"
-    class="lemonsqueezy-button"
-    id="monthly-btn"
-  >
-    Subscribe Monthly
-  </a>
-</div>
-
+  <!-- PDF canvas -->
   <canvas id="canvas"></canvas>
 
+  <!-- Prev/Next nav -->
   <div class="nav">
     <button id="prev">◀ Prev</button>
     <span id="page-num">1</span> / <span id="page-count">?</span>
@@ -58,26 +105,43 @@
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Parse URL params
       const params = new URLSearchParams(location.search);
       const bookId = params.get('book') || '1';
+
+      // Handle redirect flag
       if (params.get('subscribed') === '1') {
         localStorage.setItem('subscribed','true');
-        history.replaceState(null,'',`reader.html?book=${bookId}`);
+        history.replaceState(null, '', `reader.html?book=${bookId}`);
       }
 
+      // Sync subscription status from backend
+      try {
+        const res = await fetch('/api/check-sub', { credentials: 'include' });
+        if (res.ok) {
+          const { subscribed } = await res.json();
+          if (subscribed) localStorage.setItem('subscribed','true');
+          else           localStorage.removeItem('subscribed');
+        }
+      } catch (e) {
+        console.error('Subscription check failed', e);
+      }
+
+      // Listen for Lemon Squeezy success
       window.addEventListener('Checkout.Success', () => {
         localStorage.setItem('subscribed','true');
         document.getElementById('paywall').style.display = 'none';
         queueRenderPage(pageNum);
       });
 
+      // PDF.js setup
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
       const pdfUrl      = `/ebooks/book-${bookId}.pdf`;
       const loader      = document.getElementById('loader');
-      const paywall     = document.getElementById('paywall');
+      const paywallEl   = document.getElementById('paywall');
       const canvas      = document.getElementById('canvas');
       const ctx         = canvas.getContext('2d');
       const prevBtn     = document.getElementById('prev');
@@ -85,18 +149,16 @@
       const pageNumEl   = document.getElementById('page-num');
       const pageCountEl = document.getElementById('page-count');
 
-      function showLoader(on) {
-        loader.style.display = on ? 'flex' : 'none';
+      function showLoader(show) {
+        loader.style.display = show ? 'flex' : 'none';
       }
 
-      let pdfDoc = null,
-          pageNum = 1,
-          pageIsRendering = false,
-          pageNumPending = null;
+      // Load PDF
+      let pdfDoc = null, pageNum = 1, pageIsRendering = false, pageNumPending = null;
 
       fetch(pdfUrl, { method: 'HEAD' })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return pdfjsLib.getDocument(pdfUrl).promise;
         })
         .then(doc => {
@@ -112,19 +174,20 @@
             `<p class="error">Could not load PDF: ${err.message}</p>`;
         });
 
+      // Render a page (with gating)
       function renderPage(num) {
         if (num > 5 && localStorage.getItem('subscribed') !== 'true') {
-          paywall.style.display = 'flex';
+          paywallEl.style.display = 'flex';
           return;
         }
-        paywall.style.display = 'none';
+        paywallEl.style.display = 'none';
         pageIsRendering = true;
 
         pdfDoc.getPage(num).then(page => {
-          const vp = page.getViewport({ scale:1.5 });
-          canvas.width  = vp.width;
-          canvas.height = vp.height;
-          page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
+          const viewport = page.getViewport({ scale: 1.5 });
+          canvas.width  = viewport.width;
+          canvas.height = viewport.height;
+          page.render({ canvasContext: ctx, viewport }).promise.then(() => {
             pageIsRendering = false;
             if (pageNumPending !== null) {
               renderPage(pageNumPending);
@@ -139,6 +202,7 @@
         pageIsRendering ? pageNumPending = num : renderPage(num);
       }
 
+      // Initialize prev/next buttons and render first page
       function initializeViewer() {
         prevBtn.onclick = () => {
           if (pageNum > 1) {
