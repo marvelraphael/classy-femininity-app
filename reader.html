@@ -8,10 +8,11 @@
     * { box-sizing: border-box; margin:0; padding:0; }
     html, body { height:100%; font-family:sans-serif; }
 
+    /* Loader */
     #loader {
       position:fixed; inset:0;
-      background:rgba(255,255,255,0.95);
       display:flex; align-items:center; justify-content:center;
+      background:rgba(255,255,255,0.95);
       z-index:1000;
     }
     .spinner {
@@ -23,36 +24,41 @@
     }
     @keyframes spin { to { transform:rotate(360deg); } }
 
+    /* Paywall */
     #paywall {
       position:fixed; inset:0;
-      background:rgba(0,0,0,0.85); color:#fff;
       display:none; flex-direction:column;
       align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.85); color:#fff;
       text-align:center; padding:24px; z-index:1001;
     }
     #paywall a {
-      display:inline-block; margin:12px; padding:10px 20px;
-      background:#b20235; color:#fff; text-decoration:none;
-      border-radius:4px; font-size:1rem;
+      margin:12px; padding:10px 20px;
+      background:#b20235; color:#fff;
+      text-decoration:none; border-radius:4px;
+      font-size:1rem;
+      display:inline-block;
     }
 
+    /* PDF canvas */
     #canvas { display:block; width:100%; }
 
+    /* Navigation */
     .nav {
       position:fixed; bottom:16px; left:50%;
       transform:translateX(-50%);
+      display:flex; align-items:center;
       background:rgba(255,255,255,0.9);
       padding:8px 16px; border-radius:6px;
       box-shadow:0 2px 4px rgba(0,0,0,0.1);
-      display:flex; align-items:center; z-index:500;
+      z-index:500;
     }
     .nav button {
       margin:0 8px; padding:6px 12px;
       background:#b20235; color:#fff;
       border:none; border-radius:4px; cursor:pointer;
     }
-    .nav span { font-size:1rem; margin:0 4px; }
-
+    .nav span { margin:0 4px; font-size:1rem; }
     .error { padding:24px; text-align:center; color:red; }
   </style>
 
@@ -66,13 +72,13 @@
 
   <div id="paywall">
     <p>You’ve reached your free preview (5 pages).<br/>Subscribe to continue reading.</p>
-    <!-- embed-only checkout -->
+    <!-- Yearly plan -->
     <a
       href="https://classyfemininity.lemonsqueezy.com/checkout/buy/1780d2f3-5d6e-4e63-a9f8-b9195599568f?enabled=816279&embed=1"
       class="lemonsqueezy-button"
       id="yearly-btn"
     >Subscribe Yearly</a>
-
+    <!-- Monthly plan -->
     <a
       href="https://classyfemininity.lemonsqueezy.com/checkout/buy/1c5627ce-5495-4e43-9bfa-1cd3b9310f3a?enabled=816280&embed=1"
       class="lemonsqueezy-button"
@@ -89,116 +95,134 @@
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      const params = new URLSearchParams(location.search);
-      const bookId = params.get('book') || '1';
+  document.addEventListener('DOMContentLoaded', async () => {
+    const params = new URLSearchParams(location.search);
+    const bookId = params.get('book') || '1';
 
-      // Clean up any redirect flag
-      if (params.get('subscribed') === '1') {
-        localStorage.setItem('subscribed','true');
-        history.replaceState(null,'', `reader.html?book=${bookId}`);
-      }
+    // Clear any leftover ?subscribed=1 flag
+    if (params.get('subscribed') === '1') {
+      localStorage.setItem('subscribed','true');
+      history.replaceState(null,'', `reader.html?book=${bookId}`);
+    }
 
-      // Fetch live subscription status
-      let isSubscribed = false;
+    // 1) Initialize subscription state
+    let isSubscribed = false;
+    let customerId = localStorage.getItem('customerId');
+
+    // 2) If we have a customerId, fetch true status
+    if (customerId) {
       try {
-        const res = await fetch('/api/check-sub', { credentials:'include' });
+        const res = await fetch('/api/check-sub', {
+          headers: { 'x-customer-id': customerId }
+        });
         if (res.ok) {
           const { subscribed } = await res.json();
           isSubscribed = subscribed;
           if (subscribed) localStorage.setItem('subscribed','true');
         }
-      } catch(e) {
+      } catch (e) {
         console.error('check-sub failed', e);
       }
+    }
 
-      // Listen for embed checkout success
-      window.addEventListener('Checkout.Success', e => {
-        // reload to re-check subscription
-        window.location.reload();
+    // 3) Capture new customer_id on embed success
+    window.addEventListener('Checkout.Success', ({ detail }) => {
+      const cust = detail?.data?.attributes?.customer_id;
+      if (!cust) return console.warn('No customer_id in success event');
+      localStorage.setItem('customerId', cust);
+      customerId = cust;
+      isSubscribed = true;
+      queueRenderPage(currentPage);
+    });
+
+    // 4) PDF.js setup
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+    const pdfUrl    = `/ebooks/book-${bookId}.pdf`;
+    const loaderEl  = document.getElementById('loader');
+    const paywallEl = document.getElementById('paywall');
+    const canvas    = document.getElementById('canvas');
+    const ctx       = canvas.getContext('2d');
+    const prevBtn   = document.getElementById('prev');
+    const nextBtn   = document.getElementById('next');
+    const pageNumEl = document.getElementById('page-num');
+    const pageCntEl = document.getElementById('page-count');
+
+    function showLoader(on) {
+      loaderEl.style.display = on ? 'flex' : 'none';
+    }
+
+    let pdfDoc = null,
+        currentPage = 1,
+        pageRendering = false,
+        pagePending = null;
+
+    // Load PDF
+    showLoader(true);
+    fetch(pdfUrl, { method: 'HEAD' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return pdfjsLib.getDocument(pdfUrl).promise;
+      })
+      .then(doc => {
+        pdfDoc = doc;
+        pageCntEl.textContent = pdfDoc.numPages;
+        showLoader(false);
+        initViewer();
+      })
+      .catch(err => {
+        console.error(err);
+        showLoader(false);
+        document.body.innerHTML =
+          `<p class="error">Could not load PDF: ${err.message}</p>`;
       });
 
-      // PDF.js setup
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-
-      const pdfUrl    = `/ebooks/book-${bookId}.pdf`;
-      const loader    = document.getElementById('loader');
-      const paywallEl = document.getElementById('paywall');
-      const canvas    = document.getElementById('canvas');
-      const ctx       = canvas.getContext('2d');
-      const prevBtn   = document.getElementById('prev');
-      const nextBtn   = document.getElementById('next');
-      const pageNumEl = document.getElementById('page-num');
-      const pgCntEl   = document.getElementById('page-count');
-
-      function showLoader(on) {
-        loader.style.display = on ? 'flex' : 'none';
+    // Render a page with gating
+    function renderPage(num) {
+      if (num > 5 && !isSubscribed) {
+        paywallEl.style.display = 'flex';
+        return;
       }
+      paywallEl.style.display = 'none';
+      pageRendering = true;
 
-      let pdfDoc = null,
-          currPage = 1,
-          rendering = false,
-          pending = null;
-
-      // Load PDF
-      fetch(pdfUrl, { method:'HEAD' })
-        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return pdfjsLib.getDocument(pdfUrl).promise; })
-        .then(doc => {
-          pdfDoc = doc;
-          pgCntEl.textContent = pdfDoc.numPages;
-          showLoader(false);
-          initViewer();
-        })
-        .catch(err => {
-          console.error(err);
-          showLoader(false);
-          document.body.innerHTML = `<p class="error">Could not load PDF: ${err.message}</p>`;
+      pdfDoc.getPage(num).then(page => {
+        const vp = page.getViewport({ scale: 1.5 });
+        canvas.width  = vp.width;
+        canvas.height = vp.height;
+        page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
+          pageRendering = false;
+          if (pagePending !== null) {
+            renderPage(pagePending);
+            pagePending = null;
+          }
         });
+        pageNumEl.textContent = num;
+      });
+    }
 
-      function renderPage(n) {
-        if (n > 5 && !isSubscribed) {
-          paywallEl.style.display = 'flex';
-          return;
+    function queueRenderPage(num) {
+      pageRendering ? pagePending = num : renderPage(num);
+    }
+
+    // Navigation
+    function initViewer() {
+      prevBtn.onclick = () => {
+        if (currentPage > 1) {
+          currentPage--;
+          queueRenderPage(currentPage);
         }
-        paywallEl.style.display = 'none';
-        rendering = true;
-
-        pdfDoc.getPage(n).then(page => {
-          const vp = page.getViewport({ scale: 1.5 });
-          canvas.width  = vp.width;
-          canvas.height = vp.height;
-          page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
-            rendering = false;
-            if (pending !== null) {
-              renderPage(pending);
-              pending = null;
-            }
-          });
-          pageNumEl.textContent = n;
-        });
-      }
-
-      function queueRender(n) {
-        rendering ? pending = n : renderPage(n);
-      }
-
-      function initViewer() {
-        prevBtn.onclick = () => {
-          if (currPage > 1) {
-            currPage--;
-            queueRender(currPage);
-          }
-        };
-        nextBtn.onclick = () => {
-          if (currPage < pdfDoc.numPages) {
-            currPage++;
-            queueRender(currPage);
-          }
-        };
-        renderPage(currPage);
-      }
-    });
+      };
+      nextBtn.onclick = () => {
+        if (currentPage < pdfDoc.numPages) {
+          currentPage++;
+          queueRenderPage(currentPage);
+        }
+      };
+      renderPage(currentPage);
+    }
+  });
   </script>
 </body>
 </html>
